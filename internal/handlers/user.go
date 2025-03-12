@@ -3,18 +3,15 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
-	"unicode"
 
 	"api-server/internal/database"
 	"api-server/internal/models"
 	"api-server/internal/repositories"
+	"api-server/internal/validators"
 
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -33,9 +30,9 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if the UUID is valid
-	if _, err := uuid.Parse(userID); err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid UUID format")
+	// Validate the user ID
+	if err := validators.ValidateUserID(userID); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -50,15 +47,15 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUserHandler(w http.ResponseWriter, r *http.Request, userID string) {
-	// Query parameters check
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Body check
-	if r.ContentLength > 0 {
-		respondWithError(w, http.StatusBadRequest, "request body is not allowed")
+	// Validate request body
+	if err := validators.ValidateRequestBody(r.ContentLength, false); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -83,8 +80,9 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -94,7 +92,8 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 	}
 
-	if err := validateUserRequest(req); err != nil {
+	// Validate user request
+	if err := validators.ValidateUserRequest(req); err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -132,22 +131,22 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateUserHandler(w http.ResponseWriter, r *http.Request, userID string) {
-	// Check for query parameters
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Check if request empty
+	// Parse request body
 	var req map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && r.ContentLength > 0 {
 		respondWithError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	// Prevent username updates via body or parameters
-	if _, ok := req["username"]; ok {
-		respondWithError(w, http.StatusBadRequest, "username cannot be changed")
+	// Validate update fields
+	if err := validators.ValidateUserUpdateFields(req); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -164,26 +163,13 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request, userID string) {
 
 	// Update only provided fields
 	if firstName, ok := req["first_name"].(string); ok {
-		if strings.TrimSpace(firstName) == "" || containsNumber(firstName) {
-			respondWithError(w, http.StatusBadRequest, "invalid first_name")
-			return
-		}
 		user.FirstName = firstName
 	}
 	if lastName, ok := req["last_name"].(string); ok {
-		if strings.TrimSpace(lastName) == "" || containsNumber(lastName) {
-			respondWithError(w, http.StatusBadRequest, "invalid last_name")
-			return
-		}
 		user.LastName = lastName
 	}
 
 	if password, ok := req["password"].(string); ok {
-		if len(password) < 8 {
-			respondWithError(w, http.StatusBadRequest, "password must be at least 8 characters")
-			return
-		}
-
 		// Hash the new password before updating it
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
@@ -201,52 +187,6 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request, userID string) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func validateUserRequest(req models.UserRequest) error {
-	if strings.TrimSpace(req.FirstName) == "" {
-		return errors.New("first_name is required")
-	}
-	if strings.TrimSpace(req.LastName) == "" {
-		return errors.New("last_name is required")
-	}
-	if strings.TrimSpace(req.Username) == "" {
-		return errors.New("username is required")
-	}
-	if strings.TrimSpace(req.Password) == "" {
-		return errors.New("password is required")
-	}
-
-	if containsNumber(req.FirstName) {
-		return errors.New("first_name cannot contain numbers")
-	}
-	if containsNumber(req.LastName) {
-		return errors.New("last_name cannot contain numbers")
-	}
-
-	if !isValidEmail(req.Username) {
-		return errors.New("invalid email format")
-	}
-
-	if len(req.Password) < 8 {
-		return errors.New("password must be at least 8 characters")
-	}
-
-	return nil
-}
-
-func containsNumber(s string) bool {
-	for _, r := range s {
-		if unicode.IsNumber(r) {
-			return true
-		}
-	}
-	return false
-}
-
-func isValidEmail(email string) bool {
-	emailRegex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
-	return regexp.MustCompile(emailRegex).MatchString(email)
 }
 
 func respondWithError(w http.ResponseWriter, code int, message string) {

@@ -3,29 +3,28 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"api-server/internal/database"
 	"api-server/internal/middleware"
 	"api-server/internal/models"
 	"api-server/internal/repositories"
+	"api-server/internal/validators"
 
 	"github.com/google/uuid"
 )
 
 func InstructorHandler(w http.ResponseWriter, r *http.Request) {
-	instructorID := extractInstructorID(r.URL.Path)
+	instructorID := validators.ExtractInstructorID(r.URL.Path)
 	if instructorID == "" {
 		http.NotFound(w, r)
 		return
 	}
 
-	if _, err := uuid.Parse(instructorID); err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid UUID format")
+	if err := validators.ValidateInstructorID(instructorID); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -50,9 +49,9 @@ func CreateInstructorHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Do not allow query parameters.
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -64,7 +63,7 @@ func CreateInstructorHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate name.
-	if err := validateInstructorName(req.Name); err != nil {
+	if err := validators.ValidateInstructorName(req.Name); err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -99,9 +98,9 @@ func CreateInstructorHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateInstructorHandler handles PUT /v1/instructor/{instructor_id}.
 func UpdateInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID string) {
-	// Do not allow query parameters.
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -116,7 +115,7 @@ func UpdateInstructorHandler(w http.ResponseWriter, r *http.Request, instructorI
 		return
 	}
 
-	if err := validateInstructorName(req.Name); err != nil {
+	if err := validators.ValidateInstructorName(req.Name); err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -146,9 +145,9 @@ func UpdateInstructorHandler(w http.ResponseWriter, r *http.Request, instructorI
 
 // PatchInstructorHandler handles PATCH /v1/instructor/{instructor_id}.
 func PatchInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID string) {
-	// Do not allow query parameters.
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -163,18 +162,8 @@ func PatchInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID
 		return
 	}
 
-	// Only the "name" field is allowed.
-	nameVal, ok := req["name"]
-	if !ok {
-		respondWithError(w, http.StatusBadRequest, "no valid fields to update")
-		return
-	}
-	name, ok := nameVal.(string)
-	if !ok {
-		respondWithError(w, http.StatusBadRequest, "invalid name format")
-		return
-	}
-	if err := validateInstructorName(name); err != nil {
+	// Validate patch fields (name)
+	if err := validators.ValidateInstructorPatchFields(req); err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -191,7 +180,8 @@ func PatchInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID
 		return
 	}
 
-	instructor.Name = name
+	// Update the name from validated request
+	instructor.Name = req["name"].(string)
 	if err := repositories.UpdateInstructor(db, instructor); err != nil {
 		log.Printf("Error patching instructor: %v", err)
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -202,14 +192,15 @@ func PatchInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID
 
 // DeleteInstructorHandler handles DELETE /v1/instructor/{instructor_id}.
 func DeleteInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID string) {
-	// Do not allow query parameters.
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// Do not allow a request body.
-	if r.ContentLength > 0 {
-		respondWithError(w, http.StatusBadRequest, "request body is not allowed")
+
+	// Validate request body
+	if err := validators.ValidateRequestBody(r.ContentLength, false); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -234,14 +225,15 @@ func DeleteInstructorHandler(w http.ResponseWriter, r *http.Request, instructorI
 
 // GetInstructorHandler handles GET /v1/instructor/{instructor_id}.
 func GetInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID string) {
-	// Do not allow query parameters.
-	if len(r.URL.Query()) > 0 {
-		respondWithError(w, http.StatusBadRequest, "query parameters are not allowed")
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// Do not allow a request body.
-	if r.ContentLength > 0 {
-		respondWithError(w, http.StatusBadRequest, "request body is not allowed")
+
+	// Validate request body
+	if err := validators.ValidateRequestBody(r.ContentLength, false); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -264,25 +256,4 @@ func GetInstructorHandler(w http.ResponseWriter, r *http.Request, instructorID s
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(instructor)
-}
-
-// extractInstructorID extracts the instructor_id from the URL path.
-// Expected path: /v1/instructor/{instructor_id}
-func extractInstructorID(path string) string {
-	parts := strings.Split(path, "/")
-	if len(parts) < 4 || parts[3] == "" {
-		return ""
-	}
-	return parts[3]
-}
-
-// validateInstructorName validates the instructor's name.
-func validateInstructorName(name string) error {
-	if strings.TrimSpace(name) == "" {
-		return errors.New("name cannot be empty or just blank")
-	}
-	if containsNumber(name) {
-		return errors.New("name should not contain any numbers")
-	}
-	return nil
 }
