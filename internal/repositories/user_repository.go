@@ -32,9 +32,9 @@ func CreateUser(db *sql.DB, userReq models.UserRequest) (*models.User, error) {
 func GetUserByID(db *sql.DB, userID string) (*models.User, error) {
 	user := &models.User{}
 	err := db.QueryRow(
-		"SELECT user_id, first_name, last_name, username, account_created, account_updated FROM webapp.users WHERE user_id = $1",
+		"SELECT user_id, first_name, last_name, username, password, account_created, account_updated FROM webapp.users WHERE user_id = $1",
 		userID,
-	).Scan(&user.UserID, &user.FirstName, &user.LastName, &user.Username, &user.AccountCreated, &user.AccountUpdated)
+	).Scan(&user.UserID, &user.FirstName, &user.LastName, &user.Username, &user.Password, &user.AccountCreated, &user.AccountUpdated)
 	return user, err
 }
 
