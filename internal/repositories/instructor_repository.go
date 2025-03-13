@@ -8,7 +8,7 @@ import (
 // CreateInstructor inserts a new instructor record into the database.
 func CreateInstructor(db *sql.DB, instructor models.Instructor) (models.Instructor, error) {
 	query := `
-        INSERT INTO webapp.instructors (instructor_id, user_id, name, date_created)
+        INSERT INTO api.instructors (instructor_id, user_id, name, date_created)
         VALUES ($1, $2, $3, $4)
     `
 	_, err := db.Exec(query, instructor.InstructorID, instructor.UserID, instructor.Name, instructor.DateCreated)
@@ -22,7 +22,7 @@ func CreateInstructor(db *sql.DB, instructor models.Instructor) (models.Instruct
 func GetInstructorByID(db *sql.DB, instructorID string) (models.Instructor, error) {
 	query := `
         SELECT instructor_id, user_id, name, date_created
-        FROM webapp.instructors
+        FROM api.instructors
         WHERE instructor_id = $1
     `
 	row := db.QueryRow(query, instructorID)
@@ -37,7 +37,7 @@ func GetInstructorByID(db *sql.DB, instructorID string) (models.Instructor, erro
 // UpdateInstructor updates the instructor's name.
 func UpdateInstructor(db *sql.DB, instructor models.Instructor) error {
 	query := `
-        UPDATE webapp.instructors
+        UPDATE api.instructors
         SET name = $1
         WHERE instructor_id = $2
     `
@@ -47,7 +47,7 @@ func UpdateInstructor(db *sql.DB, instructor models.Instructor) error {
 
 // DeleteInstructor deletes an instructor by instructor_id.
 func DeleteInstructor(db *sql.DB, instructorID string) error {
-	query := `DELETE FROM webapp.instructors WHERE instructor_id = $1`
+	query := `DELETE FROM api.instructors WHERE instructor_id = $1`
 	result, err := db.Exec(query, instructorID)
 	if err != nil {
 		return err
