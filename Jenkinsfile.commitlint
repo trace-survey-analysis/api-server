@@ -1,12 +1,16 @@
 void setBuildStatus(String message, String state) {
+    def repoUrl = scm.getUserRemoteConfigs()[0].getUrl()
+    
+    echo "DEBUG: Repository URL detected: ${repoUrl}"
   step([
       $class: "GitHubCommitStatusSetter",
-      reposSource: [$class: "ManuallyEnteredRepositorySource", url: "https://www.github.com/cyse7125-sp25-team03/api-server"],
+      reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl],
       contextSource: [$class: "ManuallyEnteredCommitContextSource", context: "ci/jenkins/commitlint"],
       errorHandlers: [[$class: "ChangingBuildStatusErrorHandler", result: "UNSTABLE"]],
       statusResultSource: [ $class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: message, state: state]] ]
   ]);
 }
+
 
 
 pipeline {
