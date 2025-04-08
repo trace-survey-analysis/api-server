@@ -7,6 +7,7 @@ import (
 	"api-server/internal/config"
 	"api-server/internal/database"
 	"api-server/internal/routes"
+	"api-server/internal/services"
 )
 
 func main() {
@@ -22,6 +23,16 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
+
+	// Initialize Kafka producer with authentication
+	services.InitKafkaProducer(
+		cfg.KafkaBrokers,
+		cfg.KafkaTopic,
+		cfg.KafkaUsername,
+		cfg.KafkaPassword,
+		cfg.KafkaAuth,
+	)
+	defer services.CloseKafkaProducer()
 
 	// Register routes
 	r := routes.RegisterRoutes()

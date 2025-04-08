@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"api-server/internal/database"
+	"api-server/internal/kafka"
 	"api-server/internal/middleware"
 	"api-server/internal/models"
 	"api-server/internal/repositories"
+	"api-server/internal/services"
 	"api-server/internal/utils"
 	"api-server/internal/validators"
 
@@ -182,6 +184,36 @@ func createTraceHandler(w http.ResponseWriter, r *http.Request, courseID string)
 
 	//Create trace
 	newTrace, err := repositories.CreateTrace(database.GetDB(), trace)
+
+	// Publish to Kafka if a producer is available
+	kafkaProducer := services.GetKafkaProducer()
+	if kafkaProducer != nil {
+		// Extract bucket name and path from GCS URL
+		bucketName := utils.ExtractBucketNameFromGCS(trace.BucketPath)
+		filePath := utils.ExtractFilePathFromGCS(trace.BucketPath)
+
+		uploadMessage := kafka.TraceUploadMessage{
+			TraceID:      trace.TraceID,
+			CourseID:     trace.CourseID,
+			FileName:     trace.FileName,
+			GCSBucket:    bucketName,
+			GCSPath:      filePath,
+			InstructorID: trace.InstructorID,
+			SemesterTerm: trace.SemesterTerm,
+			Section:      trace.Section,
+			UploadedBy:   trace.UserID,
+			UploadedAt:   trace.DateCreated,
+		}
+
+		err := kafkaProducer.PublishTraceUpload(r.Context(), uploadMessage)
+		if err != nil {
+			// Log error but don't fail the response
+			log.Printf("Error publishing to Kafka: %v", err)
+		} else {
+			log.Printf("Successfully published trace %s to Kafka", trace.TraceID)
+		}
+	}
+
 	if err != nil {
 		log.Printf("Error creating trace: %v", err)
 		http.Error(w, "failed to create trace", http.StatusInternalServerError)
