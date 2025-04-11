@@ -19,6 +19,10 @@ type Config struct {
 	KafkaUsername string
 	KafkaPassword string
 	KafkaAuth     bool
+
+	// OpenTelemetry configuration
+	ServiceName  string
+	OtlpEndpoint string
 }
 
 func Load() (*Config, error) {
@@ -46,6 +50,10 @@ func Load() (*Config, error) {
 		KafkaUsername: kafkaUsername,
 		KafkaPassword: kafkaPassword,
 		KafkaAuth:     kafkaAuth,
+
+		// OpenTelemetry fields
+		ServiceName:  getEnv("SERVICE_NAME", "api-server"),
+		OtlpEndpoint: getEnv("OTLP_ENDPOINT", "localhost:4317"),
 	}, nil
 }
 
