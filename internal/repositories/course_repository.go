@@ -30,6 +30,27 @@ func GetCourseByID(db *sql.DB, courseID string) (*models.Course, error) {
 	return course, err
 }
 
+// GetAllCourses retrieves all courses
+func GetAllCourses(db *sql.DB) ([]models.Course, error) {
+	rows, err := db.Query(
+		"SELECT course_id, date_added, date_last_updated, user_id, code, name, description, instructor_id, department_id, credit_hours FROM api.courses",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	courses := []models.Course{}
+	for rows.Next() {
+		var course models.Course
+		if err := rows.Scan(&course.CourseID, &course.DateAdded, &course.DateLastUpdated, &course.UserID, &course.Code, &course.Name, &course.Description, &course.InstructorID, &course.DepartmentID, &course.CreditHours); err != nil {
+			return nil, err
+		}
+		courses = append(courses, course)
+	}
+	return courses, nil
+}
+
 // UpdateCourse updates a course in the database
 func UpdateCourse(db *sql.DB, course *models.Course) error {
 	course.DateLastUpdated = time.Now().UTC()

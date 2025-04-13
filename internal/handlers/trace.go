@@ -287,6 +287,32 @@ func getTraceByIDHandler(w http.ResponseWriter, r *http.Request, courseID string
 	json.NewEncoder(w).Encode(trace)
 }
 
+// GetAllTracesHandler handles GET /v1/traces
+func GetAllTracesHandler(w http.ResponseWriter, r *http.Request) {
+	// Validate query parameters
+	if err := validators.ValidateRequestParameters(r.URL.Query()); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Validate request body
+	if err := validators.ValidateRequestBody(r.ContentLength, false); err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	db := database.GetDB()
+	traces, err := repositories.GetAllTraces(db)
+	if err != nil {
+		log.Printf("Error retrieving traces: %v", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(traces)
+}
+
 // delete trace by traceid
 func deleteTraceHandler(w http.ResponseWriter, r *http.Request, courseID string, traceID string) {
 	//checks

@@ -34,6 +34,30 @@ func GetInstructorByID(db *sql.DB, instructorID string) (models.Instructor, erro
 	return instructor, nil
 }
 
+// GetAllInstructors retrieves all instructors
+func GetAllInstructors(db *sql.DB) ([]models.Instructor, error) {
+	query := `
+        SELECT instructor_id, user_id, name, date_created
+        FROM api.instructors
+    `
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	instructors := []models.Instructor{}
+	for rows.Next() {
+		var instructor models.Instructor
+		err := rows.Scan(&instructor.InstructorID, &instructor.UserID, &instructor.Name, &instructor.DateCreated)
+		if err != nil {
+			return nil, err
+		}
+		instructors = append(instructors, instructor)
+	}
+	return instructors, nil
+}
+
 // UpdateInstructor updates the instructor's name.
 func UpdateInstructor(db *sql.DB, instructor models.Instructor) error {
 	query := `

@@ -28,6 +28,27 @@ func GetTraceByID(db *sql.DB, traceID string) (*models.Trace, error) {
 	return trace, err
 }
 
+// GetAllTraces retrieves all traces
+func GetAllTraces(db *sql.DB) ([]models.Trace, error) {
+	rows, err := db.Query(
+		"SELECT trace_id, user_id, file_name, date_created, bucket_path, course_id, instructor_id, semester_term, section FROM api.traces",
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	traces := []models.Trace{}
+	for rows.Next() {
+		var trace models.Trace
+		if err := rows.Scan(&trace.TraceID, &trace.UserID, &trace.FileName, &trace.DateCreated, &trace.BucketPath, &trace.CourseID, &trace.InstructorID, &trace.SemesterTerm, &trace.Section); err != nil {
+			return nil, err
+		}
+		traces = append(traces, trace)
+	}
+	return traces, nil
+}
+
 // get all trace by courseID
 func GetTraceByCourseID(db *sql.DB, courseID string) ([]models.Trace, error) {
 	rows, err := db.Query(
