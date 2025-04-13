@@ -32,6 +32,9 @@ func RegisterRoutes() *mux.Router {
 	r.HandleFunc("/v1/course/{course_id}/trace", middleware.AuthMiddleware(handlers.TraceHandler)).Methods("POST", "GET")
 	r.HandleFunc("/v1/course/{course_id}/trace/{trace_id}", middleware.AuthMiddleware(handlers.TraceEntityHandler)).Methods("GET", "DELETE")
 	r.HandleFunc("/v1/traces", middleware.AuthMiddleware(handlers.GetAllTracesHandler)).Methods("GET")
+	// department and semester
+	r.HandleFunc("/v1/departments", middleware.AuthMiddleware(handlers.GetAllDepartmentsHandler)).Methods("GET")
+	r.HandleFunc("/v1/semesters", middleware.AuthMiddleware(handlers.GetAllSemesterTermsHandler)).Methods("GET")
 
 	return r
 }
