@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -361,4 +362,69 @@ func deleteTraceHandler(w http.ResponseWriter, r *http.Request, courseID string,
 
 	// return 204 status code
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// for endpoint: /v1/course/{courseId}/trace/{traceId}/pdf
+func DownloadTraceHandler(w http.ResponseWriter, r *http.Request) {
+	courseID := extractCourseID(r.URL.Path)
+	traceID := extractTraceID(r.URL.Path)
+
+	if courseID == "" || traceID == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	if _, err := uuid.Parse(courseID); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid UUID format")
+		return
+	}
+
+	if _, err := uuid.Parse(traceID); err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid UUID format")
+		return
+	}
+
+	// Check if course exists
+	if _, err := repositories.GetCourseByID(database.GetDB(), courseID); err != nil {
+		log.Printf("Error fetching course: %v", err)
+		http.Error(w, "failed to get course", http.StatusBadRequest)
+		return
+	}
+
+	// Get trace by ID
+	trace, err := repositories.GetTraceByID(database.GetDB(), traceID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "trace not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error fetching trace: %v", err)
+		http.Error(w, "failed to get trace", http.StatusInternalServerError)
+		return
+	}
+
+	// Get bucket name from environment
+	bucketName := os.Getenv("BUCKET_NAME")
+	if bucketName == "" {
+		log.Fatal("Bucket name is not set in environment variables!")
+	}
+
+	// Get file from GCS
+	fileContent, contentType, err := utils.GetFileFromGCS(trace.BucketPath, bucketName)
+	if err != nil {
+		log.Printf("Error retrieving file from GCS: %v", err)
+		http.Error(w, "failed to retrieve file", http.StatusInternalServerError)
+		return
+	}
+
+	// Set appropriate headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", trace.FileName))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileContent)))
+
+	// Write the file to the response
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(fileContent); err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }

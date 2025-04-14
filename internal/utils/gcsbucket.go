@@ -1,12 +1,13 @@
 package utils
 
 import (
-	"cloud.google.com/go/storage"
 	"context"
 	"fmt"
 	"io"
 	"log"
 	"strings"
+
+	"cloud.google.com/go/storage"
 
 	"time"
 )
@@ -67,6 +68,49 @@ func DeleteFileFromGCS(gcsURL, bucketName string) error {
 
 	log.Printf("Successfully deleted file: gs://%s/%s", bucketName, filePath)
 	return nil
+}
+
+// GetFileFromGCS retrieves a file from GCS and returns it as a byte array
+func GetFileFromGCS(gcsURL, bucketName string) ([]byte, string, error) {
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Printf("Failed to create GCS client: %v", err)
+		return nil, "", err
+	}
+	defer client.Close()
+
+	filePath := GetFilePathFromGCSURL(gcsURL)
+
+	// Create object handle
+	bucket := client.Bucket(bucketName)
+	object := bucket.Object(filePath)
+
+	// Get object attributes to determine content type
+	attrs, err := object.Attrs(ctx)
+	if err != nil {
+		log.Printf("Failed to get file attributes: %v", err)
+		return nil, "", err
+	}
+
+	contentType := attrs.ContentType
+
+	// Read the file
+	reader, err := object.NewReader(ctx)
+	if err != nil {
+		log.Printf("Failed to create reader: %v", err)
+		return nil, "", err
+	}
+	defer reader.Close()
+
+	// Read the file content
+	fileContent, err := io.ReadAll(reader)
+	if err != nil {
+		log.Printf("Failed to read file: %v", err)
+		return nil, "", err
+	}
+
+	return fileContent, contentType, nil
 }
 
 // write a function to trim filename out of filepath: gs://shaw-bucket/uploads/1741664748290248000-image.png i want to get /uploads/1741664748290248000-image.png
